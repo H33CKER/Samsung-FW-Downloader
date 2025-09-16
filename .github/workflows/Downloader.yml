@@ -13,35 +13,46 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Free up disk space
+        run: |
+          echo "Freeing disk space..."
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          df -h
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y lz4 p7zip-full wget
+          sudo apt-get install -y lz4 p7zip-full wget tar
 
       - name: Download AP file
         run: |
           echo "Downloading AP from ${{ github.event.inputs.ap_link }}"
-          wget "${{ github.event.inputs.ap_link }}" -O AP.zip
+          wget "${{ github.event.inputs.ap_link }}" -O /dev/shm/AP.zip
+          ls -lh /dev/shm
 
       - name: Extract ZIP
         run: |
-          7z x AP.zip -oap_files
+          7z x /dev/shm/AP.zip -o/dev/shm/ap_files
+          rm -f /dev/shm/AP.zip   # delete ZIP immediately
+          ls -lh /dev/shm/ap_files
 
       - name: Find and extract TAR
         run: |
-          AP_TAR=$(find ap_files -type f -name "AP*.tar.md5" | head -n 1)
+          AP_TAR=$(find /dev/shm/ap_files -type f -name "AP*.tar.md5" | head -n 1)
           echo "Found TAR: $AP_TAR"
-          mkdir -p ap_tar
-          tar -xf "$AP_TAR" -C ap_tar
+          mkdir -p /dev/shm/ap_tar
+          tar -xf "$AP_TAR" -C /dev/shm/ap_tar
+          rm -rf /dev/shm/ap_files   # delete extracted ZIP contents
+          rm -f "$AP_TAR"            # delete TAR file
+          ls -lh /dev/shm/ap_tar
 
       - name: Extract super.img.lz4
         run: |
-          SUPER=$(find ap_tar -type f -name "super.img.lz4" | head -n 1)
+          SUPER=$(find /dev/shm/ap_tar -type f -name "super.img.lz4" | head -n 1)
           echo "Found SUPER: $SUPER"
           lz4 -d "$SUPER" super.img
+          rm -rf /dev/shm/ap_tar   # delete extracted TAR contents
+          ls -lh super.img
 
       - name: Upload super.img as artifact
         uses: actions/upload-artifact@v4
