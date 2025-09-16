@@ -1,0 +1,50 @@
+name: Extract Super Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      ap_link:
+        description: "Direct link to AP file from SamFW"
+        required: true
+        type: string
+
+jobs:
+  extract-super:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lz4 p7zip-full wget
+
+      - name: Download AP file
+        run: |
+          echo "Downloading AP from ${{ github.event.inputs.ap_link }}"
+          wget "${{ github.event.inputs.ap_link }}" -O AP.zip
+
+      - name: Extract ZIP
+        run: |
+          7z x AP.zip -oap_files
+
+      - name: Find and extract TAR
+        run: |
+          AP_TAR=$(find ap_files -type f -name "AP*.tar.md5" | head -n 1)
+          echo "Found TAR: $AP_TAR"
+          mkdir -p ap_tar
+          tar -xf "$AP_TAR" -C ap_tar
+
+      - name: Extract super.img.lz4
+        run: |
+          SUPER=$(find ap_tar -type f -name "super.img.lz4" | head -n 1)
+          echo "Found SUPER: $SUPER"
+          lz4 -d "$SUPER" super.img
+
+      - name: Upload super.img as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: super-img
+          path: super.img
